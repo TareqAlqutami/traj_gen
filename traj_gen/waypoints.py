@@ -12,8 +12,8 @@ deg2rad = pi/180.0
 # rpy(np.ndarray):  orientation waypoints (roll,pitch,yaw) of size Nx3. only yaw is consumed for under-actuated vehicles.
 
 def flip(): 
-    t = np.array([0,4, 6, 8, 12])
-    # t = np.array([0,4, 8, 10, 14])
+    # t = np.array([0,4, 6, 8, 12])
+    t = np.array([0,8, 10, 15, 20])
     xyz = np.array([
       [0, 0, 2],
       [6.0, 0.0, 6.0],
@@ -87,6 +87,26 @@ def long_waypoint():
     rpy = np.zeros_like(xyz)
     return t, xyz, rpy
 
+def att_test():
+    t = np.array([0, 2, 4, 6, 8, 10])
+    xyz = np.array([
+      [0.0, 0.0, 1.5],
+      [0.0, 0.0, 1.5],
+      [0.0, 0.0, 1.5],
+      [0.0, 0.0, 1.5],
+      [0.0, 0.0, 1.5],
+      [0.0, 0.0, 1.5]
+      ])
+    rpy = np.array([
+      [0.00, 0.1, 0],
+      [0.00, 0.25, pi/6],
+      [0.00, 0.1, pi/6],
+      [0.1, 0.00, pi/6],
+      [0.2, 0.00, pi/6],
+      [0.00, 0.00, pi/6]
+      ])
+    return t, xyz, rpy
+  
 def test_position():
     t = np.array([0,2, 4])
     t = np.array([0, 3.74165739, 7.48331478])
@@ -101,3 +121,38 @@ def test_position():
       [0, 0, pi/2]
       ])
     return t, xyz, rpy
+
+def raster_scan():
+    xyz = np.array([
+      [0.0, 1.0, 3.0],
+      [0.1, 1.0, 3.0],
+      [0.1, 0.5, 3.0],
+      [0.1, 0.0, 3.0],
+
+      [0.1, 0.0, 2.8], 
+      [0.0, 0.5, 2.8],
+      [0.1, 1.0, 2.8],
+
+      [0.1, 1.0, 2.6],
+      [0.1, 0.5, 2.6],
+      [0.1, 0.0, 2.6],   
+
+      [0.1, 0.0, 2.4], 
+      [0.0, 0.5, 2.4],
+      [0.1, 1.0, 2.4],
+
+      [0.1, 1.0, 2.2],
+      [0.1, 0.5, 2.2],
+      [0.1, 0.0, 2.2],   
+
+      [0.1, 0.0, 2.0], 
+      [0.0, 0.5, 2.0],
+      [0.1, 1.0, 2.0],                
+      [0.0, 1.0, 2.0]
+      ])
+
+    t = np.arange(0,xyz.shape[0]*2,2)
+    rpy = np.zeros_like(xyz)
+
+    return t, xyz, rpy
+

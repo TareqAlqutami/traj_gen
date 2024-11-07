@@ -15,7 +15,7 @@ from std_msgs.msg import Float32
 
 from traj_gen.traj_gen.min_snap_trajectory_generators import xyzMinDerivTrajectory, xyzMinSnapTrajectory, optimizeTrajectory, YawMinAccTrajectory
 from traj_gen.traj_gen.trajectory_generators import YawTrajectory
-from traj_gen.waypoints import flip, figure_8, long_waypoint, test_position, straight
+from traj_gen.waypoints import flip, figure_8, long_waypoint, test_position, straight, att_test, raster_scan
 
 
 class MinSnapTrajectoryGenerator(Node):
@@ -66,9 +66,12 @@ class MinSnapTrajectoryGenerator(Node):
         # TODO use rqt_reconfigure to choose trajectory and ensure smooth transitions
         self.traj_type = 'min_snap'
         self.yaw_type = 'min_acc' # yaw_type: 'zeros', 'timed', 'interp', 'follow', 'min_acc'
+        self.roll_pitch_type = 'min_acc' # None or 'min_acc'
         self.current_yaw = 0.0
         # load waypoints (xyz, yaw)
-        t_waypoints, self.xyz_waypoints, self.rpy_waypoints = flip()
+        t_waypoints, self.xyz_waypoints, self.rpy_waypoints = figure_8()
+        roll_waypoints = self.rpy_waypoints[:,0]
+        pitch_waypoints = self.rpy_waypoints[:,1]
         yaw_waypoints = self.rpy_waypoints[:,2]
         # ========================================================================
 
@@ -80,6 +83,12 @@ class MinSnapTrajectoryGenerator(Node):
         else:
             raise ValueError(f"Yaw trajectory type ({self.yaw_type}) is not supported!")
  
+        if self.roll_pitch_type is not None:
+            self.roll_gen = YawMinAccTrajectory(yaw_waypoints=roll_waypoints,t_waypoints=t_waypoints)
+            self.pitch_gen = YawMinAccTrajectory(yaw_waypoints=pitch_waypoints,t_waypoints=t_waypoints)
+        else:
+            self.roll_gen = None
+            self.pitch_gen = None
     
         # XYZ generator
         if self.traj_type == 'min_snap':
@@ -103,7 +112,7 @@ class MinSnapTrajectoryGenerator(Node):
             raise ValueError(f"Trajectory type ({self.traj_type}) is not supported!")
             
   
-        update_freq = 50.0  # hz
+        update_freq = 100.0  # hz
         self.start_time = self.get_clock().now().nanoseconds
         self.prev_time = 0.0
         self.update_callback_timer = self.create_timer(1.0/update_freq,self.update_callback)
@@ -140,10 +149,17 @@ class MinSnapTrajectoryGenerator(Node):
         
         
         if self.traj_type == 'min_snap' or self.traj_type == 'min_snap2' or self.traj_type == 'optimize_traj':
+            # update translational motion
             position, vel, acc, jerk, snap  = self.xyz_gen.eval(t)
-            # update yaw 
+            # update rotational motions
             des_yaw, des_yaw_rate, des_yaw_acc = self.yaw_gen.eval(t, des_pos=position, curr_pos=self.cur_position)
-            att_rpy = np.array([0.0, 0.0, des_yaw])
+            if self.roll_gen is not None and self.pitch_gen is not None:
+                des_roll, des_roll_rate, des_roll_acc = self.roll_gen.eval(t, des_pos=position, curr_pos=self.cur_position)
+                des_pitch, des_pitch_rate, des_pitch_acc = self.pitch_gen.eval(t, des_pos=position, curr_pos=self.cur_position)
+            else:
+                des_roll = 0.0
+                des_pitch = 0.0
+            att_rpy = np.array([des_roll, des_pitch, des_yaw])
             self.get_logger().info(f"publishing commands: att={att_rpy.round(3)}, position={position.round(3)}", throttle_duration_sec=0.5)        
             pose_msg = self.pub_pose_cmd(position, att_rpy)
             rpy_msg = self.pub_rpy_cmd(att_rpy)

@@ -76,7 +76,7 @@ class HelixTrajectory:
             if (t > 0):
                 # Calculate desired Yaw
                 self.yaw = np.arctan2(self.position[1]-self.prev_position[1], self.position[0]-self.prev_position[0])
-                    
+
             # detect when yaw switches from -pi to pi (or vice-versa) and switch manually current_heading 
             if (np.sign(self.yaw) - np.sign(self.current_yaw) and abs(self.yaw-self.current_yaw) >= 2*pi-0.1):
                 self.current_yaw = self.current_yaw + np.sign(self.yaw)*2*pi
@@ -248,9 +248,12 @@ class YawTrajectory:
         if (t == 0):
             self.des_yaw = 0
         else:
-            # Calculate desired Yaw
-            self.des_yaw = np.arctan2(des_pos[1]-curr_pos[1], des_pos[0]-curr_pos[0])
-       
+            # Calculate desired Yaw (only if there is large difference)
+            if np.linalg.norm(des_pos-curr_pos)>0.1:
+                self.des_yaw = np.arctan2(des_pos[1]-curr_pos[1], des_pos[0]-curr_pos[0])
+            else:
+                self.des_yaw = self.current_yaw
+                
         # Dirty hack, detect when desEul[2] switches from -pi to pi (or vice-versa) and switch manually current_heading 
         if (np.sign(self.des_yaw) - np.sign(self.current_yaw) and abs(self.des_yaw-self.current_yaw) >= 2*pi-0.1):
             self.current_yaw = self.current_yaw + np.sign(self.des_yaw)*2*pi
