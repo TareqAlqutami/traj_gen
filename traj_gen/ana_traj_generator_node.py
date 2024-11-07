@@ -57,9 +57,8 @@ class AnaTrajectoryGenerator(Node):
         self.vel_heads = []
         self.vel_tails = []
 
-
-        # ================ choose which trajectory to use ========================
         # TODO use rqt_reconfigure to choose trajectory and ensure smooth transitions
+        # ================ choose which trajectory to use ========================
         self.traj_type = 'pose_helix'
         # ========================================================================
         
@@ -78,11 +77,25 @@ class AnaTrajectoryGenerator(Node):
             t_waypoints = np.array([0, 4, 6, 10])
             # yaw_type: 'zeros', 'timed', 'interp', 'follow'
             self.yaw_gen = YawTrajectory(yaw_waypoints=yaw_waypoints,t_waypoints=t_waypoints, yaw_type='interp',current_yaw=0.0)
-            
+
         elif self.traj_type =='att_circle':
             self.att_gen = AttCircleTrajectory(omega=0.5,max_roll=np.deg2rad(10), max_pitch=np.deg2rad(10), max_yaw=np.deg2rad(30),
                                                yaw_0=0.0)
+            self.position = np.zeros(3)
+            self.first = True
 
+        elif self.traj_type =='xyz_vel':
+            self.v_waypoints = np.array([
+                [0.0,0.0,0.0],
+                [0.1,0.2,0.2],
+                [0.4,0.2,0.2],
+                [0.4,0.4,0.0],
+                [0.0,0.0,0.0]
+                ])
+            self.t_waypoints = np.array([0, 5, 10, 15, 20])
+            self.t_idx = 0
+            self.yaw_0 = 0.0
+            self.final_pos = np.zeros(3)
         else:
             raise ValueError(f"Trajectory type ({self.traj_type}) is not supported!")
 
@@ -152,10 +165,36 @@ class AnaTrajectoryGenerator(Node):
         elif self.traj_type =='att_circle':
             att_rpy, rpy_rate = self.att_gen.eval(t)
             self.get_logger().info(f"publishing commands: rpy={att_rpy}, rpy_rate={rpy_rate}", throttle_duration_sec=0.5)
-            position = self.cur_position
-            self.pub_pose_cmd(position, att_rpy)
+            if self.first:
+                self.position = self.cur_position
+                self.first = False
+            self.pub_pose_cmd(self.position, att_rpy)
             rpy_msg = self.pub_rpy_cmd(att_rpy)
             rpy_msg = self.pub_full_twist_cmd(np.zeros(3),rpy_rate)
+
+        elif self.traj_type == 'xyz_vel':
+            # find current time index
+            if t == 0: # first waypoint
+                self.t_idx = 0
+                vel = self.v_waypoints[self.t_idx]
+                position = self.cur_position
+            elif (t >= self.t_waypoints[-1]): # we reached the last waypoint, keep it
+                self.t_idx = -1
+                vel = self.v_waypoints[self.t_idx]
+                position = self.final_pos
+            else:
+                self.t_idx = np.where(t <= self.t_waypoints)[0][0] - 1
+                vel = self.v_waypoints[self.t_idx]
+                position = self.cur_position + vel*dt
+                self.final_pos = position
+
+            att_rpy = np.array([0.0, 0.0, self.yaw_0])
+            self.get_logger().info(f"publishing commands: att={att_rpy.round(3)}, position={position.round(3)}, vel={vel.round(2)}", throttle_duration_sec=0.5)
+
+            self.pub_pose_cmd(position, att_rpy)
+            self.pub_rpy_cmd(att_rpy)
+            self.pub_linear_twist_cmd(vel)
+
         else:
             raise ValueError(f"Trajectory type ({self.traj_type}) is not supported!")
 
